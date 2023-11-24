@@ -1,45 +1,15 @@
-from datetime import datetime, timedelta
-
 import pytest
 from django.conf import settings
 from django.urls import reverse
-from django.utils import timezone
-
-from news.models import Comment, News
 
 HOME_URL = reverse('news:home')
-
-
-@pytest.fixture()
-def many_news_list():
-    today = datetime.today()
-    News.objects.bulk_create(
-        News(
-            title=f'Новость {index}',
-            text='Просто текст.',
-            date=today - timedelta(days=index)
-        )
-        for index in range(settings.NEWS_COUNT_ON_HOME_PAGE + 1)
-    )
-
-
-@pytest.fixture
-def create_two_comments(news, author):
-    now = timezone.now()
-    for index in range(2):
-        comment = Comment.objects.create(
-            news=news, author=author, text=f'Текст {index}'
-        )
-        comment.created = now + timedelta(days=index)
-        comment.save()
 
 
 @pytest.mark.usefixtures('many_news_list')
 def test_news_count(client):
     response = client.get(HOME_URL)
     object_list = response.context['object_list']
-    news_count = len(object_list)
-    assert news_count == settings.NEWS_COUNT_ON_HOME_PAGE
+    assert len(object_list) == settings.NEWS_COUNT_ON_HOME_PAGE
 
 
 @pytest.mark.usefixtures('many_news_list')

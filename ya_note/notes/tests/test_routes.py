@@ -1,7 +1,7 @@
 from http import HTTPStatus
 
 from django.contrib.auth import get_user_model
-from django.test import TestCase
+from django.test import Client, TestCase
 from django.urls import reverse
 
 from notes.models import Note
@@ -14,7 +14,11 @@ class TestRoutes(TestCase):
     @classmethod
     def setUpTestData(cls):
         cls.author = User.objects.create(username='Автор')
+        cls.author_client = Client()
+        cls.author_client.force_login(cls.author)
         cls.another_user = User.objects.create(username='Другой пользователь')
+        cls.another_client = Client()
+        cls.another_client.force_login(cls.another_user)
         cls.note = Note.objects.create(
             title='Заголовок', text='Текст', slug='slug',
             author=cls.author,
@@ -46,22 +50,20 @@ class TestRoutes(TestCase):
                 self.assertRedirects(response, redirect_url)
 
     def test_pages_availability_for_authorized_client(self):
-        self.client.force_login(self.author)
         for name in ('notes:add', 'notes:list', 'notes:success'):
             with self.subTest(name=name):
                 url = reverse(name)
-                response = self.client.get(url)
+                response = self.author_client.get(url)
                 self.assertEqual(response.status_code, HTTPStatus.OK)
 
     def test_pages_availability_for_different_users(self):
         users_statuses = (
-            (self.author, HTTPStatus.OK),
-            (self.another_user, HTTPStatus.NOT_FOUND),
+            (self.author_client, HTTPStatus.OK),
+            (self.another_client, HTTPStatus.NOT_FOUND),
         )
-        for user, status in users_statuses:
-            self.client.force_login(user)
+        for parametrized_client, status in users_statuses:
             for name in ('notes:detail', 'notes:edit', 'notes:delete'):
-                with self.subTest(name=name, user=user):
+                with self.subTest(name=name, user=parametrized_client):
                     url = reverse(name, args=(self.note.slug,))
-                    response = self.client.get(url)
+                    response = parametrized_client.get(url)
                     self.assertEqual(response.status_code, status)
